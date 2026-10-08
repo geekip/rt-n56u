@@ -172,8 +172,11 @@ dir_$(CONFIG_FIRMWARE_INCLUDE_MENTOHUST)		+= mentohust
 dir_$(CONFIG_FIRMWARE_INCLUDE_xTUN) 			+= xTun
 ifeq ($(CONFIG_FIRMWARE_INCLUDE_WING),y)
 dir_y 			+= wing
+ifneq ($(CONFIG_FIRMWARE_INCLUDE_IPT2SOCKS_FAKEDNS),y)
 dir_y 			+= ipt2socks
 endif
+endif
+dir_$(CONFIG_FIRMWARE_INCLUDE_IPT2SOCKS_FAKEDNS) += ipt2socks-fakedns
 dir_$(TROJAN_ENABLE) 			+= trojan
 dir_$(CONFIG_FIRMWARE_INCLUDE_REDSOCKS)			+= redsocks
 dir_$(CONFIG_FIRMWARE_INCLUDE_3PROXY)			+= 3proxy

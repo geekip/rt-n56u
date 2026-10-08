@@ -8,6 +8,11 @@ on:
         required: true
         default: 'master'
         type: string
+      release_tag:
+        description: 'Release 标签，不存在时自动创建'
+        required: true
+        default: 'firmware'
+        type: string
       target:
         description: '目标路由器型号'
         required: true
@@ -62,6 +67,9 @@ on:
           - XY-C1
           - ZTE_E8820S
 
+permissions:
+  contents: write
+
 env:
   IMAGES_DIR: /opt/bin
 
@@ -106,9 +114,28 @@ jobs:
           cp -f "${firmware[0]}" "$IMAGES_DIR/$TARGET.trx"
           ./clear_tree >/dev/null 2>&1
 
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.target }}
-          path: ${{ env.IMAGES_DIR }}/*.trx
-          if-no-files-found: error
+      - name: Upload firmware to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_REF: ${{ inputs.branch }}
+          TARGET: ${{ inputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          firmware="$IMAGES_DIR/$TARGET.trx"
+          commit=$(git rev-parse HEAD)
+
+          if [[ ! -f "$firmware" ]]; then
+            echo "Firmware not found: $firmware" >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$firmware" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$firmware" \
+              --target "$commit" \
+              --title "$RELEASE_TAG" \
+              --notes "Padavan $TARGET firmware built from $SOURCE_REF ($commit)."
+          fi
