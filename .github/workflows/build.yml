@@ -1,0 +1,114 @@
+name: Build Padavan
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '分支或版本号'
+        required: true
+        default: 'master'
+        type: string
+      target:
+        description: '目标路由器型号'
+        required: true
+        type: choice
+        default: 'RM2100'
+        options:
+          - 360P2
+          - 5K-W20
+          - A3004NS
+          - B70
+          - CR660x
+          - DIR-878
+          - DIR-882
+          - E8820V2
+          - HC5661A
+          - HC5761A
+          - HC5861B
+          - JCG-836PRO
+          - JCG-AC860M
+          - JCG-Q20
+          - JCG-Y2
+          - K2P-USB
+          - K2P
+          - K2P_nano
+          - MI-3
+          - MI-3C
+          - MI-4
+          - MI-MINI
+          - MI-NANO
+          - MI-R3G
+          - MI-R3P-breed
+          - MI-R3P
+          - MI-R4A
+          - MR2600
+          - MSG1500
+          - MZ-R13
+          - MZ-R13P
+          - NETGEAR-BZV
+          - NETGEAR-CHJ
+          - NEWIFI-MINI
+          - NEWIFI3
+          - OYE-001
+          - PSG1208
+          - PSG1218
+          - PSG1218_nano
+          - R2100
+          - R6220
+          - RM2100
+          - RT-AC1200GU
+          - WDR7300
+          - WR1200JS
+          - XY-C1
+          - ZTE_E8820S
+
+env:
+  IMAGES_DIR: /opt/bin
+
+jobs:
+  build:
+    name: Build ${{ inputs.target }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Prepare environment
+        run: |
+          sudo apt update
+          sudo apt install libtool-bin gperf python3-docutils autopoint gettext
+          sudo timedatectl set-timezone "Asia/Shanghai"
+
+      - name: Prepare toolchain
+        run: |
+          cd "$GITHUB_WORKSPACE/toolchain-mipsel"
+          sh dl_toolchain.sh
+
+      - name: Start build
+        env:
+          TARGET: ${{ inputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/trunk"
+          mkdir -p "$IMAGES_DIR"
+
+          fakeroot ./build_firmware_modify "$TARGET"
+
+          mapfile -t firmware < <(find images -maxdepth 1 -type f -name '*.trx' -print)
+          if (( ${#firmware[@]} != 1 )); then
+            echo "Expected one firmware image for $TARGET, found ${#firmware[@]}" >&2
+            exit 1
+          fi
+
+          cp -f "${firmware[0]}" "$IMAGES_DIR/$TARGET.trx"
+          ./clear_tree >/dev/null 2>&1
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.target }}
+          path: ${{ env.IMAGES_DIR }}/*.trx
+          if-no-files-found: error
